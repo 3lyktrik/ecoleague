@@ -1,7 +1,9 @@
 ## Φωτογραφίες από τη δημιουργία του έργου.
 
 ![photo1](https://github.com/3lyktrik/ecoleague/blob/main/photos/IMG_20250307_110624%20(Large).jpg)
+
 ![photo1](https://github.com/3lyktrik/ecoleague/blob/main/photos/IMG_20250307_113911(Large).jpg)
+
 ![photo1](https://github.com/3lyktrik/ecoleague/blob/main/photos/IMG_20250312_133259(Large).jpg)
 ![photo1](https://github.com/3lyktrik/ecoleague/blob/main/photos/IMG_20250314_102545(Large).jpg)
 ![photo1](https://github.com/3lyktrik/ecoleague/blob/main/photos/IMG_20250314_102548(Large).jpg)
