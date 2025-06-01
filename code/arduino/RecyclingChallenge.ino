@@ -1,10 +1,12 @@
-/*
- *  3ο ΓΕΛ Τρικάλων "Οδυσσέας Ελύτης"
- *  Ολοκληρωμένο Σύστημα Υποστήριξης Διαγωνισμών Ανακύκλωσης
- *	
- *	Για το Διαγωνισμό ΕΛΛΑΚ 2025
+/***************************************************************
+ *  3ο ΓΕΛ Τρικάλων - "Οδυσσέας Ελύτης"
+ *  Ομάδα Ρομποτικής: Eco League
+ *  Project: Διαγωνισμός Ανακύκλωσης
+ *  Για τον 7ο Διαγωνισμό Ανοιχτών Τεχνολογιών στην Εκπαίδευση
+ *	https://github.com/3lyktrik/ecoleague
  *
- */
+ *  Τρίκαλα - 2025
+ ***************************************************************/
 
 #include <SPI.h>
 #include <MFRC522.h>
@@ -13,6 +15,7 @@
 #include <WiFiS3.h>
 #include "secrets.h"
 #include "persons.h"
+#include <ThingSpeak.h> // always include thingspeak header file after other header files and custom macros
 
 #define RST_PIN   5
 #define SS_PIN    10
@@ -49,7 +52,7 @@ unsigned long myChannelNumber = SECRET_CH_ID;
 const char *myWriteAPIKey = SECRET_WRITE_APIKEY;
 const char *myReadAPIKey = SECRET_READ_APIKEY;
 
-// οι μετρητές για τα υλικά που ανακυκλώθηκαν
+// οι 3 μετρητές για τα υλικά που ανακυκλώθηκαν
 int metal = 0;      // ο αριθμός των μετάλλων που ανακυκλώθηκαν
 int plastic = 0;    // ο αριθμός των πλαστικών που ανακυκλώθηκαν
 int glass = 0;      // ο αριθμός των γυαλιών που ανακυκλώθηκαν
@@ -83,18 +86,21 @@ void setup()
   lcd.print("3o GEL TRIKALON");
   lcd.setCursor(0,1);
   lcd.print("Odysseas Elytis");
-
+  
   Serial.println("ΔΙΑΓΩΝΙΣΜΟΣ ΑΝΑΚΥΚΛΩΣΗΣ");
   
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
 
   // ο παρακάτω συντελεστής υπολογίστηκε με το καλιμπράρισμα
-  scale.set_scale(991.5);
+  scale.set_scale(1091.32);
   scale.tare();   // reset the scale to 0
   delay(1000);
 
   // Σύνδεση στο WiFi
   ConnectToWiFi();
+  
+  // Initialize ThingSpeak
+  ThingSpeak.begin(client);
 }
 
 void loop()
@@ -233,28 +239,34 @@ void loop()
       // αν υπάρχει νέο αντικείμενο, στείλε τη βαθμολογία στο ThingSpeak
       if( score != 0 )
       {
-        if( personFieldIndex>=1 && personFieldIndex <=8 )
-        { 
+        if( personFieldIndex>=1 && personFieldIndex<=8 )
+        {
           // Σύνδεση (ή επανασύνδεση) στο WiFi
           ConnectToWiFi();
     
           // διάβασε την τελευταία τιμή από το ThingSpeak, από το αντίστοιχο field
-          int previousScore = ThingSpeakReadLast(personFieldIndex);
-          if( previousScore >= 0 )
+          int previousScore = ThingSpeak.readIntField(myChannelNumber, personFieldIndex);
+
+          // Check the status of the read operation to see if it was successful
+          int statusCode = ThingSpeak.getLastReadStatus();
+          if(statusCode == 200)     // επιτυχής ανάγνωση από το ThingSpeak!
           {
-            Serial.println("Channel read successful!!!");
-            // γράψε το νέο σκορ στο ThingSpeak
-            // 1η παράμετρος είναι το channelField
-            if( ThingSpeakWrite(personFieldIndex, previousScore+score) == true )
+            Serial.println("Successfully Reading ThingSpeak Score: " + String(previousScore));
+            int x = ThingSpeak.writeField(myChannelNumber, personFieldIndex, score+previousScore, myWriteAPIKey);
+            if(x == 200)      // επιτυχές γράψιμο στο ThingSpeak!  
             {
-              Serial.println("Channel update successful!!!");
+              Serial.println("Channel writing successful.");
               // μηδενισμός όλων των μετρητών και του σκορ
               score = metal = plastic = glass = 0;
             }
             else
             {
-              Serial.println("Problem updating channel....");
+              Serial.println("Problem writing channel. HTTP error code " + String(x));
             }
+          }
+          else
+          {
+            Serial.println("Problem reading channel... HTTP error code " + String(statusCode));
           }
         }
         else
@@ -288,7 +300,7 @@ boolean getID()
   tagID = "";
   for( int i = 0; i < mfrc522.uid.size; i++ )
   {
-    tagID.concat(String(mfrc522.uid.uidByte[i], HEX)); // Adds the bytes in a single String variable
+    tagID.concat(String(mfrc522.uid.uidByte[i], HEX)); // Adds the 4 bytes in a single String variable
   }
   tagID.toUpperCase();
   mfrc522.PICC_HaltA(); // Stop reading
@@ -310,75 +322,5 @@ void ConnectToWiFi()
       delay(5000);     
     } 
     Serial.println("\nConnected.");
-  }
-}
-
-bool ThingSpeakWrite(int channelField, int fieldValue)
-{
-  if( client.connect(server, 80) )
-  {
-    String postData= "api_key=" + (String)myWriteAPIKey + "&field" + String(channelField) + "=" + String(fieldValue);
-    client.println("POST /update HTTP/1.1");
-    client.println("Host: api.thingspeak.com");
-    client.println("Connection: close");
-    client.println("Content-Type: application/x-www-form-urlencoded");
-    client.println("Content-Length: " + String(postData.length()));
-    client.println();
-    client.println(postData);
-    return true;
-  }
-  else
-  {
-    Serial.println("Connection Failed...");
-    return false;
-  }
-}
-
-int ThingSpeakReadLast(int channelField)
-{
-  String query = "/channels/" + String(myChannelNumber) + "/fields/" + String(channelField) + "/last.txt?key=" + String(myReadAPIKey);
-  if( client.connect(server, 80) )
-  {
-    Serial.println("connecting...");
-    Serial.println(query);    
-    client.println("GET " + query + " HTTP/1.1");
-    client.println("Host: " + String(server));
-    client.println("User-Agent: ArduinoWiFi/1.1");
-    client.println("Connection: close");
-    client.println();
-    
-    delay(1000);  // αυτό είναι απαραίτητο....
-
-
-    String data = client.readString();
-    // Αν η ανάγνωση έγινε επιτυχώς (δηλ. υπάρχει ο κωδικός 200 ΟΚ)
-    if(data.indexOf("Status: 200 OK") > 0)
-    {
-      Serial.println("Status: 200 OK");
-      // για να βρούμε την τελευταία τιμή (που είναι στο τέλος τέλος του string data),
-      // θα πάμε από το τέλος του data προς τα πίσω, όσο βρίσκουμε ψηφία.
-      int i=data.length()-1;
-      while(isDigit(data[i]))
-      {
-        i--;
-      }
-      // κατόπιν απομονώνουμε το τελευταίο μέρος του data (δηλ. από i έως το τέλος του string), 
-      // που περιέχει μόνο τα ψηφία που αποτελούν την τιμή που θέλουμε
-      int lastData = data.substring(i, data.length()).toInt();
-      Serial.print("lastData=");
-      Serial.println(lastData);
-      Serial.println();
-      return lastData;
-    }
-    else
-    {
-      Serial.println("Reading from channel error...");
-      return -11;
-    }
-  }
-  else
-  {
-    Serial.println("Connection Failed");
-    return -99;
   }
 }
