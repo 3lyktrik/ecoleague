@@ -43,4 +43,4 @@
 Δείτε αναλυτικά τη λύση μας, το σχεδιασμό και την υλοποίηση στο [docs/Σχεδιασμός.md](docs/Σχεδιασμός.md).
 
 ## Βίντεο
-[![Βίντεο παρουσίασης](https://www.youtube.com/watch?v=4Vhta9W4wgw)](https://www.youtube.com/watch?v=4Vhta9W4wgw){:target="_blank"}
+[![Βίντεο παρουσίασης](https://www.youtube.com/watch?v=4Vhta9W4wgw)](https://www.youtube.com/watch?v=4Vhta9W4wgw)
